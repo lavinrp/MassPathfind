@@ -2,120 +2,143 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#include <stdio.h>
+#include <iostream>
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size);
+#define NAV_GRID_WIDTH 15
+#define NAV_GRID_HEIGHT 15
 
-__global__ void addKernel(int *c, const int *a, const int *b)
+#define MAX_NEIGHBORS 4
+
+
+#define BLOCKED_GRID_WEIGHT 1000
+
+struct IntPair {
+	int x;
+	int y;
+};
+
+__device__
+int getGlobalIdx_1D_1D() 
 {
-    int i = threadIdx.x;
-    c[i] = a[i] + b[i];
+	return blockIdx.x *blockDim.x + threadIdx.x;
 }
 
-int main()
+__global__
+void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPahts) 
 {
-    const int arraySize = 5;
-    const int a[arraySize] = { 1, 2, 3, 4, 5 };
-    const int b[arraySize] = { 10, 20, 30, 40, 50 };
-    int c[arraySize] = { 0 };
+	int thid = getGlobalIdx_1D_1D();
 
-    // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addWithCuda failed!");
-        return 1;
-    }
+	bool closedSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+	int closedSetSize;
 
-    printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        c[0], c[1], c[2], c[3], c[4]);
+	bool openSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+	int openSetSize;
+	
+	int coordinateToScoreMap[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
 
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+	IntPair cameFrom[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+
+	//TODO: INIT ALL THESE VALUES
+
+	openSet[fromXs[thid]][fromYs[thid]] = true;
+	openSetSize = 1;
+
+	while (openSetSize) 
+	{
+		//check grid square
+		//TODO: ADD STUb
+		IntPair current; // = chooseNextGridSquare(pathRequest, openSet);
+		if (current.x = toXs[thid] && current.y == toYs[thid]) 
+		{
+			//TODO: RECONSTRUCT PATH
+		}
+		//grid square was not destination
+		openSet[current.x][current.y] = false;
+		--openSetSize;
+		closedSet[current.x][current.y] = true;
+		++closedSetSize;
+	
+		//find other neighbors
+		//TOOD: FIND NEIGHBORS
+		IntPair neighbors[MAX_NEIGHBORS];
+		int neighborCount;
+
+		for (int i = 0; i < neighborCount; i++) 
+		{
+			if (closedSet[neighbors[i].x][neighbors[i].y]) 
+			{
+				continue;
+			}
+		}
+		
+	}
+
+
+
+}
+
+void BatchPathfind(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int (&navGrid)[NAV_GRID_WIDTH][NAV_GRID_HEIGHT]) 
+{
+
+}
+
+int main() 
+{
+	std::cout << "path from: " << std::endl;
+	int fromX = 0;
+	int fromY = 0;
+	//std::cin >> fromX;
+	//std::cin >> fromY;
+
+	std::cout << "path to: " << std::endl;
+	int toX = 5;
+	int toY = 2;
+	/*std::cin >> toX;
+	std::cin >> toY;*/
+
+	//S*x************
+	//**x************
+	//**x**O**x******
+	//**x*****x******
+	//**x*****x******
+	//**xxxxxxx******
+	//***************
+	//***************
+	//***************
+	//***************
+	//***************
+	//***************
+	//***************
+	//***************
+	//***************
+
+	//create clear nav grid
+	int navGrid[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+	for (unsigned int i = 0; i < NAV_GRID_WIDTH; i++) 
+	{
+		for (unsigned int j = 0; j <NAV_GRID_HEIGHT; j++) 
+		{
+			navGrid[i][j] = 0;
+		}
+	}
+
+	//block grid
+	navGrid[2][0] = BLOCKED_GRID_WEIGHT;
+	navGrid[2][1] = BLOCKED_GRID_WEIGHT;
+	navGrid[2][2] = BLOCKED_GRID_WEIGHT;
+	navGrid[2][3] = BLOCKED_GRID_WEIGHT;
+	navGrid[2][4] = BLOCKED_GRID_WEIGHT;
+	navGrid[2][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[3][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[4][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[5][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[6][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[7][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[8][5] = BLOCKED_GRID_WEIGHT;
+	navGrid[8][4] = BLOCKED_GRID_WEIGHT;
+	navGrid[8][3] = BLOCKED_GRID_WEIGHT;
+	navGrid[8][2] = BLOCKED_GRID_WEIGHT;
 
     return 0;
 }
 
-// Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size)
-{
-    int *dev_a = 0;
-    int *dev_b = 0;
-    int *dev_c = 0;
-    cudaError_t cudaStatus;
-
-    // Choose which GPU to run on, change this on a multi-GPU system.
-    cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
-
-    // Allocate GPU buffers for three vectors (two input, one output)    .
-    cudaStatus = cudaMalloc((void**)&dev_c, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_a, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_b, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    // Launch a kernel on the GPU with one thread for each element.
-    addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-    
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    cudaStatus = cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-Error:
-    cudaFree(dev_c);
-    cudaFree(dev_a);
-    cudaFree(dev_b);
-    
-    return cudaStatus;
-}
