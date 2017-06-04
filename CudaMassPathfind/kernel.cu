@@ -76,6 +76,35 @@ void reconstructPath(const IntPair & beginPoint, const IntPair & endPoint, const
 	*length = pathIndex;
 }
 
+__device__
+void chooseNextGridSquare(const IntPair & beginPoint, const IntPair & endPoint, const bool availableGridSquares[NAV_GRID_WIDTH][NAV_GRID_HEIGHT], IntPair* bestGridSquare) {
+
+	float shortestDistance = FLT_MAX;
+	IntPair bestGridSquare;
+
+	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii){
+		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
+			if (availableGridSquares[ii][jj]){
+				IntPair gridSquare;
+				gridSquare.x = ii;
+				gridSquare.y = jj;
+
+				float gridSquareDistance = CalcSquaredDistance(gridSquare, endPoint);
+				if (gridSquareDistance < shortestDistance) {
+					shortestDistance = gridSquareDistance;
+					*bestGridSquare = gridSquare;
+				}
+			}
+		}
+	}
+}
+
+__device__
+float CalcSquaredDistance(IntPair point1, IntPair point2)
+{
+	return powf(point1.x - point2.x, 2) + powf(point1.y - point2.y, 2);
+}
+
 __global__
 void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPaths, int* length)
 {
@@ -100,12 +129,21 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 	{
 		//check grid square
 		//TODO: ADD STUb
-		IntPair current; // = chooseNextGridSquare(pathRequest, openSet);
+
+		IntPair beginPoint;
+		beginPoint.x = fromXs[thid];
+		beginPoint.y = fromYs[thid];
+
+		IntPair endPoint;
+		endPoint.x = toXs[thid];
+		endPoint.y = toYs[thid];
+
+		IntPair current;
+		chooseNextGridSquare(beginPoint, endPoint, openSet, &current);
+
+
 		if (current.x == toXs[thid] && current.y == toYs[thid]) 
 		{
-			IntPair beginPoint;
-			beginPoint.x = fromXs[thid];
-			beginPoint.y = fromYs[thid];
 			reconstructPath(beginPoint, current, cameFrom, returnedPaths[thid], length);
 			break;
 		}
@@ -116,7 +154,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		++closedSetSize;
 	
 		//find other neighbors
-		//TOOD: FIND NEIGHBORS
 		IntPair neighbors[MAX_NEIGHBORS];
 		getNeighbors(current, neighbors);
 		int neighborCount;
