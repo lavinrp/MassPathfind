@@ -120,7 +120,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 	bool closedSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
 	int closedSetSize = 0;
-
 	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii) {
 		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
 			closedSet[ii][jj] = false;
@@ -158,8 +157,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 	while (openSetSize) 
 	{
 		//check grid square
-		//TODO: ADD STUb
-
 		IntPair current;
 		chooseNextGridSquare(beginPoint, endPoint, openSet, &current);
 
@@ -198,11 +195,13 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 				if (flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] >= BLOCKED_GRID_WEIGHT) 					
 				{
 					closedSet[neighbor.x][neighbor.y] = true;
+					closedSetSize++;
 					continue;
 				}
 				else 
 				{
 					openSet[neighbor.x][neighbor.y] = true;
+					openSetSize++;
 				}
 			}
 			else if (tentativeScore >= score[neighbor.x][neighbor.y]) 
