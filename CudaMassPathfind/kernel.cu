@@ -18,6 +18,11 @@ struct IntPair {
 };
 
 __device__
+float CalcSquaredDistance(IntPair point1, IntPair point2) {
+	return powf(point1.x - point2.x, 2) + powf(point1.y - point2.y, 2);
+}
+
+__device__
 int getGlobalIdx_1D_1D() 
 {
 	return blockIdx.x *blockDim.x + threadIdx.x;
@@ -80,7 +85,6 @@ __device__
 void chooseNextGridSquare(const IntPair & beginPoint, const IntPair & endPoint, const bool availableGridSquares[NAV_GRID_WIDTH][NAV_GRID_HEIGHT], IntPair* bestGridSquare) {
 
 	float shortestDistance = FLT_MAX;
-	IntPair bestGridSquare;
 
 	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii){
 		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
@@ -99,11 +103,7 @@ void chooseNextGridSquare(const IntPair & beginPoint, const IntPair & endPoint, 
 	}
 }
 
-__device__
-float CalcSquaredDistance(IntPair point1, IntPair point2)
-{
-	return powf(point1.x - point2.x, 2) + powf(point1.y - point2.y, 2);
-}
+
 
 __global__
 void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPaths, int* length)
