@@ -4,8 +4,8 @@
 
 #include <iostream>
 
-#define NAV_GRID_WIDTH 15
-#define NAV_GRID_HEIGHT 15
+#define NAV_GRID_WIDTH 2
+#define NAV_GRID_HEIGHT 2
 
 #define MAX_NEIGHBORS 4
 
@@ -220,9 +220,98 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 }
 
-void BatchPathfind(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int (&navGrid)[NAV_GRID_WIDTH][NAV_GRID_HEIGHT]) 
+void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int numPaths, int (&h_navGrid)[NAV_GRID_WIDTH][NAV_GRID_HEIGHT])
 {
+	int cudaStatus = 0;
+	int* d_fromXs;
+	cudaStatus = cudaMalloc(&d_fromXs, sizeof(int)*numPaths);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc1 failed!");
+		return;
+	}
+	cudaStatus = cudaMemcpy(d_fromXs, h_fromXs, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy1 failed!");
+		return;
+	}
 
+	int* d_fromYs;
+	cudaStatus = cudaMalloc(&d_fromYs, sizeof(int)*numPaths);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc2 failed!");
+		return;
+	}
+	cudaStatus = cudaMemcpy(d_fromYs, h_fromYs, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy2 failed!");
+		return;
+	}
+
+	int* d_toXs;
+	cudaStatus = cudaMalloc(&d_toXs, sizeof(int)*numPaths);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc3 failed!");
+		return;
+	}
+	cudaStatus = cudaMemcpy(d_toXs, h_toXs, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy3 failed!");
+		return;
+	}
+	
+	int* d_toYs;
+	cudaStatus = cudaMalloc(&d_toYs, sizeof(int)*numPaths);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc4 failed!");
+		return;
+	}
+	cudaStatus = cudaMemcpy(d_toYs, h_toYs, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy4 failed!");
+		return;
+	}
+	
+	int* d_flatNavGrid;
+	cudaStatus = cudaMalloc(&d_flatNavGrid, sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc5 failed!");
+		return;
+	}
+	cudaStatus = cudaMemcpy(d_flatNavGrid, h_navGrid, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy5 failed!");
+		return;
+	}
+
+	IntPair** d_returnedPaths;
+	cudaStatus = cudaMalloc(&d_returnedPaths, sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc6 failed!");
+		return;
+	}
+
+	int* d_length;
+	cudaStatus = cudaMalloc(&d_length, sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc7 failed!");
+		return;
+	}
+
+	BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
+
+	IntPair** h_returnedPaths = (IntPair**)malloc(sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	cudaStatus = cudaMemcpy(h_returnedPaths, d_returnedPaths, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy6 failed!");
+		return;
+	}
+
+	int* h_length = (int*)malloc(sizeof(int));
+	cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy7 failed!");
+		return;
+	}
 }
 
 int main() 
@@ -266,12 +355,12 @@ int main()
 	}
 
 	//block grid
-	navGrid[2][0] = BLOCKED_GRID_WEIGHT;
+	/*navGrid[2][0] = BLOCKED_GRID_WEIGHT;
 	navGrid[2][1] = BLOCKED_GRID_WEIGHT;
 	navGrid[2][2] = BLOCKED_GRID_WEIGHT;
 	navGrid[2][3] = BLOCKED_GRID_WEIGHT;
 	navGrid[2][4] = BLOCKED_GRID_WEIGHT;
-	navGrid[2][5] = BLOCKED_GRID_WEIGHT;
+	/*navGrid[2][5] = BLOCKED_GRID_WEIGHT;
 	navGrid[3][5] = BLOCKED_GRID_WEIGHT;
 	navGrid[4][5] = BLOCKED_GRID_WEIGHT;
 	navGrid[5][5] = BLOCKED_GRID_WEIGHT;
@@ -280,7 +369,16 @@ int main()
 	navGrid[8][5] = BLOCKED_GRID_WEIGHT;
 	navGrid[8][4] = BLOCKED_GRID_WEIGHT;
 	navGrid[8][3] = BLOCKED_GRID_WEIGHT;
-	navGrid[8][2] = BLOCKED_GRID_WEIGHT;
+	navGrid[8][2] = BLOCKED_GRID_WEIGHT;*/
+
+	const int NumPaths = 1;
+
+	int fromXs[NumPaths] = { 0 };
+	int fromYs[NumPaths] = { 0 };
+	int toXs[NumPaths] = { 1 };
+	int toYs[NumPaths] = { 1 };
+
+	BatchPathfind(fromXs, fromYs, toXs, toYs, NumPaths, navGrid);
 
     return 0;
 }
