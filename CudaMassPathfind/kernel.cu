@@ -24,6 +24,12 @@ int getGlobalIdx_1D_1D()
 }
 
 __device__
+int flatten2dCoordinate(int x, int y) 
+{
+	return x * NAV_GRID_WIDTH + y;
+}
+
+__device__
 void getNeighbors(const IntPair & gridSquareCoordinate, IntPair* neighbors) {
 	for (unsigned int ii = 0; ii < MAX_NEIGHBORS; ++ii)
 	{
@@ -81,7 +87,7 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 	bool openSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
 	int openSetSize;
 	
-	int coordinateToScoreMap[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+	int score[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
 
 	IntPair cameFrom[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
 
@@ -119,8 +125,19 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		{
 			if (closedSet[neighbors[i].x][neighbors[i].y]) 
 			{
-				continue;
+				continue;// no need to evaluate already evaluated nodes
 			}
+			//cost of reaching neighbor using current path
+			IntPair neighbor = neighbors[i];
+			int transitionCost = ( flatNavGrid[flatten2dCoordinate(current.x, current.y)] + flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] ) / 2;
+			int tentativeScore = score[current.x][current.y] + transitionCost;
+				
+			//discover new node
+			if (!openSet[neighbor.x][neighbor.y]) 
+			{
+
+			}
+			
 		}
 		
 	}
