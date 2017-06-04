@@ -4,6 +4,7 @@
 
 #include <iostream>
 
+
 #define NAV_GRID_WIDTH 2
 #define NAV_GRID_HEIGHT 2
 
@@ -46,21 +47,25 @@ void getNeighbors(const IntPair & gridSquareCoordinate, IntPair* neighbors) {
 	bool yUp = (gridSquareCoordinate.y + 1 < NAV_GRID_HEIGHT);
 	bool yDown = (gridSquareCoordinate.y - 1 >= 0);
 
-	if (xUp) {
+	if (xUp) 
+	{
 		neighbors[0].x = gridSquareCoordinate.x + 1;
 		neighbors[0].y = gridSquareCoordinate.y;
 	}
-	if (xDown) {
-		neighbors[0].x = gridSquareCoordinate.x - 1;
-		neighbors[0].y = gridSquareCoordinate.y;
+	if (xDown) 
+	{
+		neighbors[1].x = gridSquareCoordinate.x - 1;
+		neighbors[1].y = gridSquareCoordinate.y;
 	}
-	if (yUp) {
-		neighbors[0].x = gridSquareCoordinate.x;
-		neighbors[0].y = gridSquareCoordinate.y + 1;
+	if (yUp) 
+	{
+		neighbors[2].x = gridSquareCoordinate.x;
+		neighbors[2].y = gridSquareCoordinate.y + 1;
 	}
-	if (yDown) {
-		neighbors[0].x = gridSquareCoordinate.x;
-		neighbors[0].y = gridSquareCoordinate.y - 1;
+	if (yDown) 
+	{
+		neighbors[3].x = gridSquareCoordinate.x;
+		neighbors[3].y = gridSquareCoordinate.y - 1;
 	}
 }
 
@@ -156,6 +161,7 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 	while (openSetSize) 
 	{
+		printf("here??\n");
 		//check grid square
 		IntPair current;
 		chooseNextGridSquare(beginPoint, endPoint, openSet, &current);
@@ -164,6 +170,12 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		if (current.x == toXs[thid] && current.y == toYs[thid]) 
 		{
 			reconstructPath(beginPoint, current, cameFrom, returnedPaths[thid], length);
+			for (int i = 0; i < *length; i++) 
+			{
+				int tempx = returnedPaths[thid][i].x;
+				int tempy = returnedPaths[thid][i].y;
+				printf("(%i, %i)\n", tempx, tempy);
+			}
 			break;
 		}
 		//grid square was not destination
@@ -175,12 +187,19 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		//find other neighbors
 		IntPair neighbors[MAX_NEIGHBORS];
 		getNeighbors(current, neighbors);
-		int neighborCount;
+		int neighborCount = 4;
 
+		printf("found %i neighbors\n", neighborCount);
 		for (int i = 0; i < neighborCount; i++) 
 		{
+			if (neighbors[i].x == -1 || neighbors[i].y == -1)
+			{
+				printf("bad neighbor\n");
+				continue;
+			}
 			if (closedSet[neighbors[i].x][neighbors[i].y]) 
 			{
+				printf("hit\n");
 				continue;// no need to evaluate already evaluated nodes
 			}
 			//cost of reaching neighbor using current path
@@ -191,15 +210,18 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 			//discover new node
 			if (!openSet[neighbor.x][neighbor.y]) 
 			{
+				printf("discovering new node\n");
 				//add blocked to closed set and unblocked to open set
 				if (flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] >= BLOCKED_GRID_WEIGHT) 					
 				{
+					printf("adding to closed set\n");
 					closedSet[neighbor.x][neighbor.y] = true;
 					closedSetSize++;
 					continue;
 				}
 				else 
 				{
+					printf("adding to open set\n");
 					openSet[neighbor.x][neighbor.y] = true;
 					openSetSize++;
 				}
@@ -220,7 +242,7 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 }
 
-void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int numPaths, int (&h_navGrid)[NAV_GRID_WIDTH][NAV_GRID_HEIGHT])
+void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int numPaths, int* h_navGrid /*(&h_navGrid)[NAV_GRID_WIDTH][NAV_GRID_HEIGHT]*/)
 {
 	int cudaStatus = 0;
 	int* d_fromXs;
@@ -277,14 +299,14 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		fprintf(stderr, "cudaMalloc5 failed!");
 		return;
 	}
-	cudaStatus = cudaMemcpy(d_flatNavGrid, h_navGrid, sizeof(int)*numPaths, cudaMemcpyHostToDevice);
+	cudaStatus = cudaMemcpy(d_flatNavGrid, h_navGrid, sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMemcpy5 failed!");
 		return;
 	}
 
 	IntPair** d_returnedPaths;
-	cudaStatus = cudaMalloc(&d_returnedPaths, sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	cudaStatus = cudaMalloc(&d_returnedPaths, sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc6 failed!");
 		return;
@@ -297,14 +319,7 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		return;
 	}
 
-	BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
-
-	IntPair** h_returnedPaths = (IntPair**)malloc(sizeof(int)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
-	cudaStatus = cudaMemcpy(h_returnedPaths, d_returnedPaths, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy6 failed!");
-		return;
-	}
+	//BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
 
 	int* h_length = (int*)malloc(sizeof(int));
 	cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
@@ -312,6 +327,20 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		fprintf(stderr, "cudaMemcpy7 failed!");
 		return;
 	}
+
+	IntPair** h_returnedPaths = (IntPair**)malloc(sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	cudaStatus = cudaMemcpy(h_returnedPaths, d_returnedPaths, sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH, cudaMemcpyDeviceToHost);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy6 failed!");
+		return;
+	}
+
+	//int* h_length = (int*)malloc(sizeof(int));
+	//cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
+	//if (cudaStatus != cudaSuccess) {
+	//	fprintf(stderr, "cudaMemcpy7 failed!");
+	//	return;
+	//}
 }
 
 int main() 
@@ -378,7 +407,8 @@ int main()
 	int toXs[NumPaths] = { 1 };
 	int toYs[NumPaths] = { 1 };
 
-	BatchPathfind(fromXs, fromYs, toXs, toYs, NumPaths, navGrid);
+	int testNavGrid[4] = { 0,0,0,0 };
+	BatchPathfind(fromXs, fromYs, toXs, toYs, NumPaths, testNavGrid);
 
     return 0;
 }
