@@ -172,14 +172,30 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 			//discover new node
 			if (!openSet[neighbor.x][neighbor.y]) 
 			{
-
+				//add blocked to closed set and unblocked to open set
+				if (flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] >= BLOCKED_GRID_WEIGHT) 					
+				{
+					closedSet[neighbor.x][neighbor.y] = true;
+					continue;
+				}
+				else 
+				{
+					openSet[neighbor.x][neighbor.y] = true;
+				}
+			}
+			else if (tentativeScore >= score[neighbor.x][neighbor.y]) 
+			{
+				//found a worse path
+				continue;
 			}
 			
+			//update or insert values for node
+			cameFrom[neighbor.x][neighbor.y] = current;
+			score[neighbor.x][neighbor.y] = tentativeScore;
+
 		}
 		
 	}
-
-
 
 }
 
