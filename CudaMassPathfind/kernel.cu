@@ -128,8 +128,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 	while (openSetSize) 
 	{
 		//check grid square
-		//TODO: ADD STUb
-
 		IntPair beginPoint;
 		beginPoint.x = fromXs[thid];
 		beginPoint.y = fromYs[thid];
@@ -176,11 +174,13 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 				if (flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] >= BLOCKED_GRID_WEIGHT) 					
 				{
 					closedSet[neighbor.x][neighbor.y] = true;
+					closedSetSize++;
 					continue;
 				}
 				else 
 				{
 					openSet[neighbor.x][neighbor.y] = true;
+					openSetSize++;
 				}
 			}
 			else if (tentativeScore >= score[neighbor.x][neighbor.y]) 
