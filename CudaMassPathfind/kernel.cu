@@ -29,8 +29,55 @@ int flatten2dCoordinate(int x, int y)
 	return x * NAV_GRID_WIDTH + y;
 }
 
+__device__
+void getNeighbors(const IntPair & gridSquareCoordinate, IntPair* neighbors) {
+	for (unsigned int ii = 0; ii < MAX_NEIGHBORS; ++ii)
+	{
+		neighbors[ii].x = neighbors[ii].y = -1;
+	}
+
+	bool xUp = (gridSquareCoordinate.x + 1 < NAV_GRID_WIDTH);
+	bool xDown = (gridSquareCoordinate.x - 1 >= 0);
+	bool yUp = (gridSquareCoordinate.y + 1 < NAV_GRID_HEIGHT);
+	bool yDown = (gridSquareCoordinate.y - 1 >= 0);
+
+	if (xUp) {
+		neighbors[0].x = gridSquareCoordinate.x + 1;
+		neighbors[0].y = gridSquareCoordinate.y;
+	}
+	if (xDown) {
+		neighbors[0].x = gridSquareCoordinate.x - 1;
+		neighbors[0].y = gridSquareCoordinate.y;
+	}
+	if (yUp) {
+		neighbors[0].x = gridSquareCoordinate.x;
+		neighbors[0].y = gridSquareCoordinate.y + 1;
+	}
+	if (yDown) {
+		neighbors[0].x = gridSquareCoordinate.x;
+		neighbors[0].y = gridSquareCoordinate.y - 1;
+	}
+}
+
+__device__
+void reconstructPath(const IntPair & beginPoint, const IntPair & endPoint, const IntPair cameFrom[NAV_GRID_WIDTH][NAV_GRID_HEIGHT], IntPair* backwardsOrderPath, int* length) {
+	IntPair foundSquare = endPoint;
+
+	int pathIndex = 0;
+	while (foundSquare.x != beginPoint.x && foundSquare.y != beginPoint.y)
+	{
+		backwardsOrderPath[pathIndex].x = foundSquare.x;
+		backwardsOrderPath[pathIndex].y = foundSquare.y;
+
+		foundSquare = cameFrom[foundSquare.x][foundSquare.y];
+		++pathIndex;
+	}
+
+	*length = pathIndex;
+}
+
 __global__
-void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPahts) 
+void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPaths, int* length)
 {
 	int thid = getGlobalIdx_1D_1D();
 
@@ -54,9 +101,13 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		//check grid square
 		//TODO: ADD STUb
 		IntPair current; // = chooseNextGridSquare(pathRequest, openSet);
-		if (current.x = toXs[thid] && current.y == toYs[thid]) 
+		if (current.x == toXs[thid] && current.y == toYs[thid]) 
 		{
-			//TODO: RECONSTRUCT PATH
+			IntPair beginPoint;
+			beginPoint.x = fromXs[thid];
+			beginPoint.y = fromYs[thid];
+			reconstructPath(beginPoint, current, cameFrom, returnedPaths[thid], length);
+			break;
 		}
 		//grid square was not destination
 		openSet[current.x][current.y] = false;
@@ -67,6 +118,7 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		//find other neighbors
 		//TOOD: FIND NEIGHBORS
 		IntPair neighbors[MAX_NEIGHBORS];
+		getNeighbors(current, neighbors);
 		int neighborCount;
 
 		for (int i = 0; i < neighborCount; i++) 
