@@ -110,17 +110,47 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 {
 	int thid = getGlobalIdx_1D_1D();
 
+	IntPair beginPoint;
+	beginPoint.x = fromXs[thid];
+	beginPoint.y = fromYs[thid];
+
+	IntPair endPoint;
+	endPoint.x = toXs[thid];
+	endPoint.y = toYs[thid];
+
 	bool closedSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
-	int closedSetSize;
+	int closedSetSize = 0;
+
+	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii) {
+		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
+			closedSet[ii][jj] = false;
+		}
+	}
 
 	bool openSet[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
-	int openSetSize;
+	int openSetSize = 0;
+	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii) {
+		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
+			openSet[ii][jj] = false;
+		}
+	}
 	
 	int score[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
+	for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii) {
+		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
+			score[ii][jj] = INT_MAX;
+		}
+	}
+	score[beginPoint.x][beginPoint.y] = 0;
 
 	IntPair cameFrom[NAV_GRID_WIDTH][NAV_GRID_HEIGHT];
-
-	//TODO: INIT ALL THESE VALUES
+	// In case we end up needing to initialize. As of now, we do not.
+	/*for (unsigned int ii = 0; ii < NAV_GRID_WIDTH; ++ii) {
+		for (unsigned int jj = 0; jj < NAV_GRID_HEIGHT; ++jj) {
+			cameFrom[ii][jj].x = 0;
+			cameFrom[ii][jj].y = 0;
+		}
+	}*/
 
 	openSet[fromXs[thid]][fromYs[thid]] = true;
 	openSetSize = 1;
@@ -129,14 +159,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 	{
 		//check grid square
 		//TODO: ADD STUb
-
-		IntPair beginPoint;
-		beginPoint.x = fromXs[thid];
-		beginPoint.y = fromYs[thid];
-
-		IntPair endPoint;
-		endPoint.x = toXs[thid];
-		endPoint.y = toYs[thid];
 
 		IntPair current;
 		chooseNextGridSquare(beginPoint, endPoint, openSet, &current);
