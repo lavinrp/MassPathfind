@@ -77,16 +77,15 @@ void reconstructPath(const IntPair & beginPoint, const IntPair & endPoint, const
 	while (foundSquare.x != beginPoint.x && foundSquare.y != beginPoint.y)
 	{
 
-		printf("path Index: %i\n", pathIndex);
-
 		backwardsOrderPath[pathIndex].x = foundSquare.x;
 		backwardsOrderPath[pathIndex].y = foundSquare.y;
-
-		printf("foundSquare: (%i, %i)\n", foundSquare.x, foundSquare.y);
 
 		foundSquare = cameFrom[foundSquare.x][foundSquare.y];
 		++pathIndex;
 	}
+	backwardsOrderPath[pathIndex].x = foundSquare.x;
+	backwardsOrderPath[pathIndex].y = foundSquare.y;
+	++pathIndex;
 
 	*length = pathIndex;
 }
@@ -116,7 +115,16 @@ void chooseNextGridSquare(const IntPair & beginPoint, const IntPair & endPoint, 
 
 
 __global__
-void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int numPaths, int* flatNavGrid, IntPair** returnedPaths, int* length)
+void BatchPathFindKernel(
+						int* fromXs, 
+						int* fromYs, 
+						int* toXs, 
+						int* toYs, 
+						int numPaths, 
+						int* flatNavGrid, 
+						IntPair* returnedPaths, 
+						size_t returnedPathsPitch, 
+						int* length)
 {
 	int thid = getGlobalIdx_1D_1D();
 
@@ -166,7 +174,6 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 	while (openSetSize) 
 	{
-		printf("here??\n");
 		//check grid square
 		IntPair current;
 		chooseNextGridSquare(beginPoint, endPoint, openSet, &current);
@@ -174,13 +181,13 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 		if (current.x == toXs[thid] && current.y == toYs[thid]) 
 		{
-			printf("found path\n");
-			reconstructPath(beginPoint, current, cameFrom, returnedPaths[thid], length);
-			printf("length is : %i", length);
+			IntPair* returnPath = returnedPaths + thid * returnedPathsPitch;
+			reconstructPath(beginPoint, current, cameFrom, returnPath, length);
+			printf("length is : %i\n", *length);
 			for (int i = 0; i < *length; i++) 
 			{
-				int tempx = returnedPaths[thid][i].x;
-				int tempy = returnedPaths[thid][i].y;
+				int tempx = returnPath[i].x;
+				int tempy = returnPath[i].y;
 				printf("(%i, %i)\n", tempx, tempy);
 			}
 			break;
@@ -196,17 +203,14 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 		getNeighbors(current, neighbors);
 		int neighborCount = 4;
 
-		printf("found %i neighbors\n", neighborCount);
 		for (int i = 0; i < neighborCount; i++) 
 		{
 			if (neighbors[i].x == -1 || neighbors[i].y == -1)
 			{
-				printf("bad neighbor\n");
 				continue;
 			}
 			if (closedSet[neighbors[i].x][neighbors[i].y]) 
 			{
-				printf("hit\n");
 				continue;// no need to evaluate already evaluated nodes
 			}
 			//cost of reaching neighbor using current path
@@ -217,18 +221,15 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 			//discover new node
 			if (!openSet[neighbor.x][neighbor.y]) 
 			{
-				printf("discovering new node\n");
 				//add blocked to closed set and unblocked to open set
 				if (flatNavGrid[flatten2dCoordinate(neighbor.x, neighbor.y)] >= BLOCKED_GRID_WEIGHT) 					
 				{
-					printf("adding to closed set\n");
 					closedSet[neighbor.x][neighbor.y] = true;
 					closedSetSize++;
 					continue;
 				}
 				else 
 				{
-					printf("adding to open set\n");
 					openSet[neighbor.x][neighbor.y] = true;
 					openSetSize++;
 				}
@@ -312,8 +313,9 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		return;
 	}
 
-	IntPair** d_returnedPaths;
-	cudaStatus = cudaMalloc(&d_returnedPaths, sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
+	IntPair* d_returnedPaths;
+	size_t returnedPathsPitch;
+	cudaStatus = cudaMallocPitch(&d_returnedPaths, &returnedPathsPitch, NAV_GRID_WIDTH * sizeof(IntPair), NAV_GRID_HEIGHT);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc6 failed!");
 		return;
@@ -326,19 +328,19 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		return;
 	}
 
-	BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
+	BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, returnedPathsPitch, d_length);
 
 	IntPair** h_returnedPaths = (IntPair**)malloc(sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
 	cudaStatus = cudaMemcpy(h_returnedPaths, d_returnedPaths, sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH, cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy6 failed!");
+		fprintf(stderr, "cudaMemcpy8 failed!");
 		return;
 	}
 
 	int* h_length = (int*)malloc(sizeof(int));
 	cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy7 failed!");
+		fprintf(stderr, "cudaMemcpy9 failed!");
 		return;
 	}
 
