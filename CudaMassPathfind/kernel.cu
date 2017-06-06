@@ -76,8 +76,13 @@ void reconstructPath(const IntPair & beginPoint, const IntPair & endPoint, const
 	int pathIndex = 0;
 	while (foundSquare.x != beginPoint.x && foundSquare.y != beginPoint.y)
 	{
+
+		printf("path Index: %i\n", pathIndex);
+
 		backwardsOrderPath[pathIndex].x = foundSquare.x;
 		backwardsOrderPath[pathIndex].y = foundSquare.y;
+
+		printf("foundSquare: (%i, %i)\n", foundSquare.x, foundSquare.y);
 
 		foundSquare = cameFrom[foundSquare.x][foundSquare.y];
 		++pathIndex;
@@ -169,7 +174,9 @@ void BatchPathFindKernel(int* fromXs, int* fromYs, int* toXs, int* toYs, int num
 
 		if (current.x == toXs[thid] && current.y == toYs[thid]) 
 		{
+			printf("found path\n");
 			reconstructPath(beginPoint, current, cameFrom, returnedPaths[thid], length);
+			printf("length is : %i", length);
 			for (int i = 0; i < *length; i++) 
 			{
 				int tempx = returnedPaths[thid][i].x;
@@ -319,19 +326,19 @@ void BatchPathfind(int* h_fromXs, int* h_fromYs, int* h_toXs, int* h_toYs, int n
 		return;
 	}
 
-	//BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
-
-	int* h_length = (int*)malloc(sizeof(int));
-	cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy7 failed!");
-		return;
-	}
+	BatchPathFindKernel <<<1, 1>>>(d_fromXs, d_fromYs, d_toXs, d_toYs, numPaths, d_flatNavGrid, d_returnedPaths, d_length);
 
 	IntPair** h_returnedPaths = (IntPair**)malloc(sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH);
 	cudaStatus = cudaMemcpy(h_returnedPaths, d_returnedPaths, sizeof(IntPair)*NAV_GRID_HEIGHT*NAV_GRID_WIDTH, cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMemcpy6 failed!");
+		return;
+	}
+
+	int* h_length = (int*)malloc(sizeof(int));
+	cudaStatus = cudaMemcpy(h_length, d_length, sizeof(int)*numPaths, cudaMemcpyDeviceToHost);
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpy7 failed!");
 		return;
 	}
 
